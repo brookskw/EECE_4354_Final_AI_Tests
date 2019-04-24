@@ -2,14 +2,15 @@
 # Partner: Alvin Gao
 # brookskw
 # rosalia.brooks@vanderbilt.edu
-# File name: mnist_loader.py
+# File name: mnist_loader_cn.py
 
-# April 15, 2019
-# 4:15 PM
+# April 24, 2019
+# 10:15 AM
 
 """
     Source for Code is from Michael Neilson's book "Neural Nets and Deep Learning" - Oct 2018
     http://neuralnetworksanddeeplearning.com/chap1.html
+    This has been edited to properly format the data for use in a convolution neural network.
 """
 
 """
@@ -73,18 +74,23 @@ def load_data_wrapper():
     the training data and the validation / test data.  These formats
     turn out to be the most convenient for use in our neural network
     code."""
+    '''
+    EDITS MADE
+    The edits were to convert the result data into numpy 1 x 10 arrays for easy conversion
+    To tensor and use in the MSELoss object.
+    As well, returns each separate piece instead of sipping them together. Too many format
+    conversions felt tedious and was probably very costly.
+    Still trying to adjust this so that it is not converting a numpy array to a list and
+    then back again. I feel that is inefficient and their must be a better way
+    '''
     tr_d, va_d, te_d = load_data()
-    training_inputs = [np.reshape(x, (784, 1)) for x in tr_d[0]]
-    training_results = [vectorized_result(y) for y in tr_d[1]]
-    training_data = zip(training_inputs, training_results)
-    validation_inputs = [np.reshape(x, (784, 1)) for x in va_d[0]]
-    validation_data = zip(validation_inputs, va_d[1])
-    test_inputs = [np.reshape(x, (784, 1)) for x in te_d[0]]
-    test_data = zip(test_inputs, te_d[1])
-    test_data = list(test_data)
-    training_data = list(training_data)
-    validation_data = list(validation_data)
-    return training_data, validation_data, test_data
+    training_inputs = np.array([np.reshape(x, (1, 1, 28, 28)) for x in tr_d[0]])
+    training_results = np.array([vectorized_result(y) for y in tr_d[1]])
+    validation_inputs = np.array([np.reshape(x, (1, 1, 28, 28)) for x in va_d[0]])
+    validation_results = np.array([vectorized_result(y) for y in va_d[1]])
+    test_inputs = np.array([np.reshape(x, (1, 1, 28, 28)) for x in te_d[0]])
+    test_results = np.array([vectorized_result(y) for y in te_d[1]])
+    return training_inputs, training_results, validation_inputs, validation_results, test_inputs, test_results
 
 
 def vectorized_result(j):
