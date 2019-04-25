@@ -16,16 +16,19 @@ convolution neural network with the PyTorch.nn library as well as other
 packages in the PyTorch bundle.
 
 Uses helper functions from other files:
-Insert File Names Here
+conv_net
+
+Needs to be done:
+detailed comments explaining what each step does and why it is important.
+sample results and explanation of results (maybe use statistics)
+clean up, cite the PyTorch tutorials as reference
 """
 
-from incl import mnist_loader as ml
 from incl import conv_net as cn
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-# Declare out network as outlined in conv_net
+# Declare our network as outlined in conv_net
 net = cn.Net()
 
 # Get the list of learnable parameters from the net object
@@ -33,7 +36,7 @@ params = list(net.parameters())
 print(len(params))
 print(params[0].size()) # conv1's .weight
 
-in_im = nn.randn(1, 1, 32, 32)
+in_im = torch.randn(1, 1, 32, 32)
 out = net(in_im)
 print(out)
 

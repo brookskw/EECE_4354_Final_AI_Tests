@@ -20,6 +20,9 @@ several epochs with the test data.
 Ultimately, this should result in a class that returns a trained
 convolution neural network that can then be passed handwritten images
 to detect. This is the end goal of the project.
+
+Batch_Size for this experiment is 1. Takes longer to train, but the loss is updated
+after every image.
 """
 
 
@@ -32,7 +35,7 @@ import torch.optim as optim
 train_sam_size = 50000
 ver_sam_size = 10000
 test_sam_size = 10000
-num_epochs = 5
+num_epochs = 2
 learning_rate = 0.01
 max_loss = 0.5
 classes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -51,7 +54,7 @@ test_res = torch.from_numpy(ttr)
 
 # initialize our neural network and our criterion for calculating our loss function
 net = cn.Net()
-criterion = nn.MSELoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 
 # We run our net against the training data for several epochs. For this, it computes the average
@@ -63,7 +66,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         output = net(training_im[i])
         target = training_res[i].view(1, -1)
-        loss = criterion(output, target)
+        loss = criterion(output, torch.max(target, 1)[1].long())
         running_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -79,7 +82,7 @@ sum_loss = 0
 for j in range(ver_sam_size):
     output = net(validation_im[j])
     target = validation_res[j].view(1, -1)
-    loss = criterion(output, target)
+    loss = criterion(output, torch.max(target, 1)[1].long())
     sum_loss += loss.item()
 
 print(sum_loss/ver_sam_size)
