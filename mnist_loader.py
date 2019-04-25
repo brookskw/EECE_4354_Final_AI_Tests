@@ -1,105 +1,156 @@
-# Kyle Brooks
-# brookskw
-# kyle.w.brooks@vanderbilt.edu
-# Partnered with: Alvin Gao
+# NAME: Alvin Gao
+# VUNETID: gaoa
+# EMAIL: alvin.gao@vanderbilt.edu
+# Partnered with: Kyle Brookes
 
-# Example_Net.py
-# April 15, 2019 16:15
+# referenced code from:
+# https://gist.github.com/xmfbit/b27cdbff68870418bdb8cefa86a2d558
 
-"""
-    Source for Code is from Michael Neilson's book "Neural Nets and Deep Learning" - Oct 2018
-    http://neuralnetworksanddeeplearning.com/chap1.html
+# torch imports for neural net
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision  # has data loaders for common datasets such as Imagenet, CIFAR10, MNIST, etc
+import torchvision.transforms as transforms
+import torch.optim as optim
 
-"""
-
-"""
-mnist_loader
-~~~~~~~~~~~~
-
-A library to load the MNIST image data.  For details of the data
-structures that are returned, see the doc strings for ``load_data``
-and ``load_data_wrapper``.  In practice, ``load_data_wrapper`` is the
-function usually called by our neural network code.
-"""
-
-# Libraries
-# Standard library
-import _pickle as cPickle
-import gzip
-
-# Third-party libraries
+# imports to display image plots
+import matplotlib.pyplot as plt
 import numpy as np
 
-
-def load_data():
-    """Return the MNIST data as a tuple containing the training data,
-    the validation data, and the test data.
-
-    The ``training_data`` is returned as a tuple with two entries.
-    The first entry contains the actual training images.  This is a
-    numpy ndarray with 50,000 entries.  Each entry is, in turn, a
-    numpy ndarray with 784 values, representing the 28 * 28 = 784
-    pixels in a single MNIST image.
-
-    The second entry in the ``training_data`` tuple is a numpy ndarray
-    containing 50,000 entries.  Those entries are just the digit
-    values (0...9) for the corresponding images contained in the first
-    entry of the tuple.
-
-    The ``validation_data`` and ``test_data`` are similar, except
-    each contains only 10,000 images.
-
-    This is a nice data format, but for use in neural networks it's
-    helpful to modify the format of the ``training_data`` a little.
-    That's done in the wrapper function ``load_data_wrapper()``, see
-    below.
-    """
-    f = gzip.open('mnist.pkl.gz', 'rb')
-    training_data, validation_data, test_data = cPickle.load(f, encoding='latin1')
-    f.close()
-    return training_data, validation_data, test_data
+# import to track time
+import time
 
 
-def load_data_wrapper():
-    """Return a tuple containing ``(training_data, validation_data,
-    test_data)``. Based on ``load_data``, but the format is more
-    convenient for use in our implementation of neural networks.
-
-    In particular, ``training_data`` is a list containing 50,000
-    2-tuples ``(x, y)``.  ``x`` is a 784-dimensional numpy.ndarray
-    containing the input image.  ``y`` is a 10-dimensional
-    numpy.ndarray representing the unit vector corresponding to the
-    correct digit for ``x``.
-
-    ``validation_data`` and ``test_data`` are lists containing 10,000
-    2-tuples ``(x, y)``.  In each case, ``x`` is a 784-dimensional
-    numpy.ndarry containing the input image, and ``y`` is the
-    corresponding classification, i.e., the digit values (integers)
-    corresponding to ``x``.
-
-    Obviously, this means we're using slightly different formats for
-    the training data and the validation / test data.  These formats
-    turn out to be the most convenient for use in our neural network
-    code."""
-    tr_d, va_d, te_d = load_data()
-    training_inputs = [np.reshape(x, (784, 1)) for x in tr_d[0]]
-    training_results = [vectorized_result(y) for y in tr_d[1]]
-    training_data = zip(training_inputs, training_results)
-    validation_inputs = [np.reshape(x, (784, 1)) for x in va_d[0]]
-    validation_data = zip(validation_inputs, va_d[1])
-    test_inputs = [np.reshape(x, (784, 1)) for x in te_d[0]]
-    test_data = zip(test_inputs, te_d[1])
-    test_data = list(test_data)
-    training_data = list(training_data)
-    validation_data = list(validation_data)
-    return training_data, validation_data, test_data
+# function to show an image, uses matplot
+def imshow(img):
+    img = img / 2 + 0.5  # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
 
 
-def vectorized_result(j):
-    """Return a 10-dimensional unit vector with a 1.0 in the jth
-    position and zeroes elsewhere.  This is used to convert a digit
-    (0...9) into a corresponding desired output from the neural
-    network."""
-    e = np.zeros((10, 1))
-    e[j] = 1.0
-    return e
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1)
+        self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
+
+        # an affine operation: y = Wx + b
+        self.fc1 = nn.Linear(in_features=16 * 4 * 4, out_features=120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    # define forward function of pytorch
+    # determines how channels are computed between levels
+    # with pytorch, the back-propagation function is automatically made alongside the forward function
+    #   will use autograd function for back propagation
+    def forward(self, x):
+        # Max pooling over a (2, 2) window, if the size is a square you could specify a single number
+        x = F.relu(self.conv1(x))  # ReLU activation of the convolution
+        x = F.max_pool2d(x, 2)  # pool to shrink image
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)
+        x = x.view(-1, self.num_flat_features(x))  # change tensor to linear shape
+        x = F.relu(self.fc1(x))  # ReLU activation of the linear operation
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
+
+# initialization ==================================================================================
+# initialize neural net
+net = Net()
+print(net)
+
+# MNIST database is composed of handwritten digits examples
+#   it has a training set of 60,000 examples, 50,000 examples = training and 10,000 examples = test
+# batch_size generalizes the amount of data being passed over, groups images in 'batches'
+#   training on larger batch sizes results in worse generalization but takes a lot longer to process
+batch_size = 1
+# for MNIST dataset, mean and standard deviation is 0.1307 and 0.3081 respectively
+transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+
+# get 60,000 training images
+train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+print('>>> total training batch number: %d' % (len(train_loader)))
+
+# get 10,000 test images
+test_set = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+test_loader = torch.utils.data.DataLoader(dataset=test_set, batch_size=batch_size, shuffle=False)
+print('>>> total testing batch number: %d' % (len(test_loader)))
+
+# training ========================================================================================
+# higher learning rate (lr) will produce better accuracy, but too high may lead to false positives
+#   learning rate too low would make the network not adjust any of its weights
+optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)  # using a "SGD with momentum"
+criterion = nn.CrossEntropyLoss()  # using a "Classification Cross-Entropy loss"
+
+total_time = 0.0  # total elapsed time during training
+every_n = 1000  # amount to print statistics by
+num_epochs = 2  # number of times passing images through neural net
+print('>>> %d epochs, printing every %d image statistics:' % (num_epochs, every_n))
+
+# epoch  = number of times running through (forward and back) the neural network
+for epoch in range(num_epochs):  # loop over the dataset multiple times
+    running_loss = 0.0
+    start_time = time.time()  # keep track of time taken
+    for batch_idx, data in enumerate(train_loader, 0):
+        # get the inputs
+        inputs, labels = data
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward + backward + optimize
+        outputs = net(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # print statistics
+        running_loss += loss.item()  # count total losses for these every_n images
+        if batch_idx % every_n == (every_n - 1):  # print once every every_n mini-batches
+            print('==>>> epoch: %d, batch index: %5d / %d, train loss: %.6f' %
+                  (epoch + 1, batch_idx + 1, len(train_loader), running_loss / every_n))
+            running_loss = 0.0
+
+    end_time = time.time()  # get epoch end time
+    print('=====>>> time taken for %d epoch: %0.6f seconds\n' % (epoch + 1, end_time - start_time))
+    total_time += end_time - start_time  # add epoch time to total time
+print('Finished Training\n=====>>> time taken for training: %0.6f seconds\n' % total_time)
+
+# testing =========================================================================================
+# preliminary test, show user a visual of the test
+# test batch_size images to give user an idea ot working neural net
+print('Loading Example %d images...' % batch_size)
+data_iter = iter(test_loader)
+images, labels = data_iter.next()
+imshow(torchvision.utils.make_grid(images))  # print images
+outputs = net(images)
+_, predicted = torch.max(outputs, 1)
+print('Predicted:    ', ' '.join('%3s' % predicted[j].item() for j in range(batch_size)))
+print('Ground Truth: ', ' '.join('%3s' % labels[j].item() for j in range(batch_size)))
+
+# now on to testing for all test images
+correct_cnt, running_loss = 0, 0
+total_cnt = 0
+with torch.no_grad():  # don't back propagate this time, only forward evaluate
+    for data in test_loader:
+        images, labels = data
+        outputs = net(images)
+        _, predicted_label = torch.max(outputs.data, 1)
+
+        total_cnt += labels.size()[0]
+        correct_cnt += (predicted_label == labels).sum().item()
+
+print('\nAccuracy of the neural net: %d / %d test images = %0.4f %%' %
+      (correct_cnt, len(test_loader), 100.0 * (correct_cnt / total_cnt)))
+
