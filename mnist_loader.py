@@ -48,7 +48,7 @@ class Net(nn.Module):
     def forward(self, x):
         # Max pooling over a (2, 2) window, if the size is a square you could specify a single number
         x = F.relu(self.conv1(x))  # ReLU activation of the convolution
-        x = F.max_pool2d(x, 2)  # pool to shrink image
+        x = F.max_pool2d(x, 2)  # pool to down-sample image
         x = F.relu(self.conv2(x))
         x = F.max_pool2d(x, 2)
         x = x.view(-1, self.num_flat_features(x))  # change tensor to linear shape
@@ -79,9 +79,17 @@ batch_size = 1
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 
 # get 60,000 training images
+# all_train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+# all_train_loader = torch.utils.data.DataLoader(dataset=all_train_set, batch_size=batch_size, shuffle=True)
 train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+
+# # split dataset into training and validation data
+# num_validation = 10000  # number of validation data
+# num_training = len(all_train_loader) - num_validation  # rest is training data
+# train_loader, validation_loader = torch.utils.data.random_split(all_train_loader, [num_training, num_validation])
 print('>>> total training batch number: %d' % (len(train_loader)))
+# print('>>> total validation batch number: %d' % (len(validation_loader)))
 
 # get 10,000 test images
 test_set = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
@@ -118,8 +126,8 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
         # print statistics
         running_loss += loss.item()  # count total losses for these every_n images
         if batch_idx % every_n == (every_n - 1):  # print once every every_n mini-batches
-            print('==>>> epoch: %d, batch index: %5d / %d, train loss: %.6f' %
-                  (epoch + 1, batch_idx + 1, len(train_loader), running_loss / every_n))
+            print('==>>> epoch: %d/%d, batch index: %5d/%d, train loss: %.6f' %
+                  (epoch + 1, num_epochs, batch_idx + 1, len(train_loader), running_loss / every_n))
             running_loss = 0.0
 
     end_time = time.time()  # get epoch end time
@@ -135,9 +143,27 @@ data_iter = iter(test_loader)
 images, labels = data_iter.next()
 imshow(torchvision.utils.make_grid(images))  # print images
 outputs = net(images)
-_, predicted = torch.max(outputs, 1)
-print('Predicted:    ', ' '.join('%3s' % predicted[j].item() for j in range(batch_size)))
-print('Ground Truth: ', ' '.join('%3s' % labels[j].item() for j in range(batch_size)))
+_, predicted = torch.max(outputs, dim=1)
+
+# get confidence levels for predictions
+sm = torch.nn.Softmax(outputs)  # get softmax for all batch_size outputs
+top_two = torch.topk(outputs, 2, dim=1)  # gets the top two predictions
+distribution = []  # hold final activation values for last network layer
+prob1 = []  # distribution probability of the first guess
+prob2 = []  # distribution probability of the second guess
+for j in range(batch_size):
+    distribution.append(sm.dim.data[j])  # get the 0-9 distribution tensor values of one output
+    distribution[j].add_((-1 * torch.min(distribution[j])) + 1)  # cancel all negatives, add all by smallest value
+    prob1.append(100.0 * (labels[0].item() / torch.sum(distribution[j])))  # get percentage of top guess
+    prob2.append(100.0 * (top_two[0][j][1].item() / torch.sum(distribution[j])))  # get percentage of second guess
+
+# print out statistics
+print('Ground Truth: ', ' '.join('%5s' % labels[j].item() for j in range(batch_size)))
+print('Predicted:    ', ' '.join('%5s' % predicted[j].item() for j in range(batch_size)))
+print('Confidence %: ', ' '.join('%5.2f' % prob1[j].item() for j in range(batch_size)))
+print()
+print('2nd Predicted:', ' '.join('%5s' % top_two[1][j][1].item() for j in range(batch_size)))
+print('Confidence %: ', ' '.join('%5.2f' % prob2[j].item() for j in range(batch_size)))
 
 # now on to testing for all test images
 correct_cnt, running_loss = 0, 0
