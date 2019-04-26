@@ -172,7 +172,7 @@ print('Confidence %: ', ' '.join('%5.2f' % prob1[j].item() for j in range(test_b
 print('\n2nd Predicted:', ' '.join('%5s' % top_two[1][j][1].item() for j in range(test_batch_size)))
 print('Confidence %: ', ' '.join('%5.2f' % prob2[j].item() for j in range(test_batch_size)))
 
-# now on to testing for all evaluation images
+# part 2: now on to testing for all evaluation images
 correct_cnt, running_loss = 0, 0
 total_cnt = 0
 with torch.no_grad():  # don't back propagate this time, only forward evaluate
