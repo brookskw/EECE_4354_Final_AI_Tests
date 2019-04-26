@@ -21,20 +21,15 @@ import numpy as np
 # import to track time
 import time
 
-# import to read in images
-import glob
-import cv2 as cv
-
 
 # function to show an image, uses matplot
 def imshow(img):
-    img = img / 2 + 0.5  # un-normalize
+    img = img / 2 + 0.5  # unnormalize
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
 
-# class to initialize the neural network
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -84,18 +79,23 @@ batch_size = 1
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 
 # get 60,000 training images
+# all_train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+# all_train_loader = torch.utils.data.DataLoader(dataset=all_train_set, batch_size=batch_size, shuffle=True)
 train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+
+# # split dataset into training and validation data
+# num_validation = 10000  # number of validation data
+# num_training = len(all_train_loader) - num_validation  # rest is training data
+# train_loader, validation_loader = torch.utils.data.random_split(all_train_loader, [num_training, num_validation])
 print('>>> total training batch number: %d' % (len(train_loader)))
+# print('>>> total validation batch number: %d' % (len(validation_loader)))
 
 # get 10,000 test images
 test_set = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 test_loader = torch.utils.data.DataLoader(dataset=test_set, batch_size=batch_size, shuffle=False)
 print('>>> total testing batch number: %d\n' % (len(test_loader)))
 
-'''
-========================================= Start Training ==========================================
-'''
 # training ========================================================================================
 # higher learning rate (lr) will produce better accuracy, but too high may lead to false positives
 #   learning rate too low would make the network not adjust any of its weights
@@ -103,7 +103,7 @@ optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)  # using a "SGD 
 criterion = nn.CrossEntropyLoss()  # using a "Classification Cross-Entropy loss"
 
 total_time = 0.0  # total elapsed time during training
-every_n = 5000  # amount to print statistics by
+every_n = 1000  # amount to print statistics by
 num_epochs = 2  # number of times passing images through neural net
 print('>>> %d epochs, printing every %d image statistics:' % (num_epochs, every_n))
 
@@ -135,18 +135,11 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
     total_time += end_time - start_time  # add epoch time to total time
 print('Finished Training\n=====>>> time taken for training: %0.6f seconds\n' % total_time)
 
-'''
-========================================================================================= End Training
-========================================== Start Evaluation ==========================================
-'''
-# evaluation =========================================================================================
-# part 1: preliminary test, show user a visual of the evaluation
-# evaluate batch_size images to give user an idea ot working neural net
-test_batch_size = 4
-test_test_set = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-test_test_loader = torch.utils.data.DataLoader(dataset=test_test_set, batch_size=test_batch_size, shuffle=False)
-print('Loading Example %d images...' % test_batch_size)
-data_iter = iter(test_test_loader)
+# testing =========================================================================================
+# preliminary test, show user a visual of the test
+# test batch_size images to give user an idea ot working neural net
+print('Loading Example %d images...' % batch_size)
+data_iter = iter(test_loader)
 images, labels = data_iter.next()
 imshow(torchvision.utils.make_grid(images))  # print images
 outputs = net(images)
@@ -158,21 +151,22 @@ top_two = torch.topk(outputs, 2, dim=1)  # gets the top two predictions
 distribution = []  # hold final activation values for last network layer
 prob1 = []  # distribution probability of the first guess
 prob2 = []  # distribution probability of the second guess
-for j in range(test_batch_size):
-    print('Softmax for %dth: %s' % (j, sm.dim.data[j]))
+for j in range(batch_size):
+    print('Softmax values of %dth prediction: ' % sm.dim.data[j])
     distribution.append(sm.dim.data[j])  # get the 0-9 distribution tensor values of one output
     distribution[j].add_((-1 * torch.min(distribution[j])) + 1)  # cancel all negatives, add all by smallest value
     prob1.append(100.0 * (labels[0].item() / torch.sum(distribution[j])))  # get percentage of top guess
     prob2.append(100.0 * (top_two[0][j][1].item() / torch.sum(distribution[j])))  # get percentage of second guess
 
 # print out statistics
-print('\nGround Truth: ', ' '.join('%5s' % labels[j].item() for j in range(test_batch_size)))
-print('Predicted:    ', ' '.join('%5s' % predicted[j].item() for j in range(test_batch_size)))
-print('Confidence %: ', ' '.join('%5.2f' % prob1[j].item() for j in range(test_batch_size)))
-print('\n2nd Predicted:', ' '.join('%5s' % top_two[1][j][1].item() for j in range(test_batch_size)))
-print('Confidence %: ', ' '.join('%5.2f' % prob2[j].item() for j in range(test_batch_size)))
+print('Ground Truth: ', ' '.join('%5s' % labels[j].item() for j in range(batch_size)))
+print('Predicted:    ', ' '.join('%5s' % predicted[j].item() for j in range(batch_size)))
+print('Confidence %: ', ' '.join('%5.2f' % prob1[j].item() for j in range(batch_size)))
+print()
+print('2nd Predicted:', ' '.join('%5s' % top_two[1][j][1].item() for j in range(batch_size)))
+print('Confidence %: ', ' '.join('%5.2f' % prob2[j].item() for j in range(batch_size)))
 
-# now on to testing for all evaluation images
+# now on to testing for all test images
 correct_cnt, running_loss = 0, 0
 total_cnt = 0
 with torch.no_grad():  # don't back propagate this time, only forward evaluate
@@ -184,82 +178,6 @@ with torch.no_grad():  # don't back propagate this time, only forward evaluate
         total_cnt += labels.size()[0]
         correct_cnt += (predicted_label == labels).sum().item()
 
-print('\nAccuracy of the neural net: %d/%d test images = %0.3f%%\n' %
+print('\nAccuracy of the neural net: %d / %d test images = %0.4f %%' %
       (correct_cnt, len(test_loader), 100.0 * (correct_cnt / total_cnt)))
 
-'''
-==================================================================================== End Evaluation
-========================================== Start Testing ==========================================
-'''
-# real test =======================================================================================
-# test with hand-drawn image set, 10 samples for each digit 0-9
-images = glob.glob('./hand_digits/*.png')  # load in the images
-sample_counter = 0  # keep track of proper label
-for fname in images:
-    # Load the image, convert to gray scale, and down-sample to 28x28
-    img = cv.resize(cv.imread(fname, 0), (28, 28))  # convert gray image to down-sampled image
-    img = cv.bitwise_not(img)  # invert image to match MNIST data set
-    dst_dir = ('./hand_digits/%s') % str(int(sample_counter / 10))  # make directory to proper label folder
-    cv.imwrite('%s/%s_%d.jpg' % (dst_dir, str(int(sample_counter / 10)), sample_counter), img)  # write to folder
-    sample_counter += 1
-    # if ((sample_counter % 10) == 0):  # only show one example for each digit
-    #     cv.imshow(fname + '  label=' + str(int(sample_counter / 10)), img)
-    #     cv.waitKey(10)
-
-sample_transform = transforms.Compose([transforms.Grayscale(num_output_channels=1),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.1307,), (0.3081,))])
-sample_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.ImageFolder(root='./hand_digits/', transform=sample_transform),
-    batch_size=10, shuffle=False)
-num_samples = len(sample_loader)  # number of samples loaded into array
-print('Processing Total Sample Accuracy %d images...\n' % sample_counter)
-samp_data_iter = iter(sample_loader)
-for k in range(int(sample_counter / num_samples)):
-    print('==> Testing Accuracy for [%d] samples:' % k)
-    samp_images, samp_labels = samp_data_iter.next()
-    imshow(torchvision.utils.make_grid(samp_images))  # print images
-    samp_outputs = net(samp_images)
-    _, samp_predicted = torch.max(samp_outputs, dim=1)
-
-    # get confidence levels for predictions of sample images
-    samp_sm = torch.nn.Softmax(samp_outputs)  # get softmax for all all samples
-    samp_top_two = torch.topk(samp_outputs, 2, dim=1)  # gets the top two predictions
-    samp_distribution = []  # hold final activation values for last network layer
-    samp_prob1 = []  # distribution probability of the first guess
-    samp_prob2 = []  # distribution probability of the second guess
-    for j in range(num_samples):
-        samp_distribution.append(samp_sm.dim.data[j])  # get the 0-9 distribution tensor values of one output
-        samp_distribution[j].add_((-1 * torch.min(samp_distribution[j])) + 1)  # cancel all negatives, add all by smallest value
-        samp_prob1.append(100.0 * (samp_labels[0].item() / torch.sum(samp_distribution[j])))  # get percentage of top guess
-        samp_prob2.append(100.0 * (samp_top_two[0][j][1].item() / torch.sum(samp_distribution[j])))  # get percentage of second guess
-
-    # print out statistics
-    print('\n==>Ground Truth: ', ' '.join('%5s' % samp_labels[j].item() for j in range(num_samples)))
-    print('==>Predicted:    ', ' '.join('%5s' % samp_predicted[j].item() for j in range(num_samples)))
-    print('==>Confidence %: ', ' '.join('%5.2f' % samp_prob1[j].item() for j in range(num_samples)))
-    print('\n==>2nd Predicted:', ' '.join('%5s' % samp_top_two[1][j][1].item() for j in range(num_samples)))
-    print('==>Confidence %: ', ' '.join('%5.2f' % samp_prob2[j].item() for j in range(num_samples)))
-
-# now find total accuracy processing the 100 sample data
-sampleset_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.ImageFolder(root='./hand_digits/', transform=sample_transform),
-    batch_size=1, shuffle=False)
-num_samples = len(sampleset_loader)  # number of samples loaded into array
-print('\nProcessing Total Sample Accuracy %d images...\n' % num_samples)
-samp_data_iter = iter(sampleset_loader)
-sam_correct_cnt, sam_running_loss = 0, 0
-sam_total_cnt = 0
-with torch.no_grad():  # don't back propagate this time, only forward evaluate
-    for data in sampleset_loader:
-        images, labels = data
-        outputs = net(images)
-        _, predicted_label = torch.max(outputs.data, 1)
-        sam_total_cnt += labels.size()[0]
-        sam_correct_cnt += (predicted_label == labels).sum().item()
-
-print('Accuracy of the neural net: %d/%d sample images = %0.3f%%\n' %
-      (sam_correct_cnt, len(sampleset_loader), 100.0 * (sam_correct_cnt / sam_total_cnt)))
-
-# cv.waitKey(0)
-# cv.destroyAllWindows()

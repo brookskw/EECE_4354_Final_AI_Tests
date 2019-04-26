@@ -1,0 +1,11 @@
+# Ignore folders for the processed digits
+hand_digits/0
+hand_digits/1
+hand_digits/2
+hand_digits/3
+hand_digits/4
+hand_digits/5
+hand_digits/6
+hand_digits/7
+hand_digits/8
+hand_digits/9
