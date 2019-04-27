@@ -31,6 +31,7 @@ from incl import conv_net as cn
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import time
 
 train_sam_size = 50000
 ver_sam_size = 10000
@@ -59,6 +60,7 @@ optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 
 # We run our net against the training data for several epochs. For this, it computes the average
 # loss for every 5000 images.
+start_time = time.time()
 running_loss = 0
 for epoch in range(num_epochs):
     # training loop on each of our 50000 training images.
@@ -75,9 +77,14 @@ for epoch in range(num_epochs):
             print('[%d, %5d] loss: %.3f' %
                   (epoch + 1, i + 1, running_loss / 5000))
             running_loss = 0.0
+
+end_time = time.time()
+print('Total Running Time [Training]: ', end_time - start_time)
+
 # This should have trained our network. Now we can verify this training with the validation
 # data
 
+start_time = time.time()
 sum_loss = 0
 for j in range(ver_sam_size):
     output = net(validation_im[j])
@@ -85,11 +92,14 @@ for j in range(ver_sam_size):
     loss = criterion(output, torch.max(target, 1)[1].long())
     sum_loss += loss.item()
 
-print(sum_loss/ver_sam_size)
+end_time = time.time()
+print('Average Loss on 10000 Validation Images: ', sum_loss/ver_sam_size)
+print('Total Running Time [Validation]: ', end_time - start_time)
 
 # This gives us an idea of how our network is performing after training.
 # Now we compare it to our test data.
 
+start_time = time.time()
 correct = 0
 for i in range(test_sam_size):
     output = net(test_im[i])
@@ -98,5 +108,7 @@ for i in range(test_sam_size):
     _, predicted = torch.max(output, 1)
     if guess == predicted:
         correct += 1
+end_time = time.time()
+print('Total Running Time [Test]: ', end_time - start_time)
 
 print('Accuracy on 10000 Test Images: %d %%' % (100 * correct/test_sam_size))
